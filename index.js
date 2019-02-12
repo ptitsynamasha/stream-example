@@ -40,22 +40,27 @@ function saveFile(filename, contents, callback) {
 }
 
 
-function spider(url, callback) {
-    request(url, (err, resp, body) => {
-        if (err) {
-            return callback(err)
-        }
-        const articles = getArticlesData(body);
+function spider(urls, callback) {
+    urls.forEach(url => {
+        request(url, (err, resp, body) => {
+            if (err) {
+                return callback(err)
+            }
 
-        articles.forEach(({date, subject, slug}) => {
-            request(slug, (err, resp, articleBody) => {
-                const text = getArticleText(articleBody);
-                saveFile(`articles/${date}.txt`, text, err => {
+            const articles = getArticlesData(body);
+            articles.forEach(({date, subject, slug}) => {
+                request(slug, (err, resp, articleBody) => {
                     if (err) {
-                        return callback(err);
+                        return callback(err)
                     }
-                    console.log(`Downloaded and saved: ${date}`);
-                    callback(null, date);
+                    const text = getArticleText(articleBody);
+                    saveFile(`articles/${date}.txt`, text, err => {
+                        if (err) {
+                            return callback(err);
+                        }
+                        console.log(`Downloaded and saved: ${date}`);
+                        callback(null, date);
+                    })
                 })
             })
         })
@@ -63,9 +68,30 @@ function spider(url, callback) {
 }
 
 
-const url = 'http://antropogenez.ru/articles/';
+const urls = [
+    'http://antropogenez.ru/articles/p/1',
+    'http://antropogenez.ru/articles/p/2',
+    'http://antropogenez.ru/articles/p/3',
+    // 'http://antropogenez.ru/articles/p/4',
+    // 'http://antropogenez.ru/articles/p/5',
+    // 'http://antropogenez.ru/articles/p/6',
+    // 'http://antropogenez.ru/articles/p/8',
+    // 'http://antropogenez.ru/articles/p/9',
+    // 'http://antropogenez.ru/articles/p/10',
+    // 'http://antropogenez.ru/articles/p/11',
+    // 'http://antropogenez.ru/articles/p/12',
+    // 'http://antropogenez.ru/articles/p/13',
+    // 'http://antropogenez.ru/articles/p/14',
+    // 'http://antropogenez.ru/articles/p/15',
+    // 'http://antropogenez.ru/articles/p/16',
+    // 'http://antropogenez.ru/articles/p/17',
+    // 'http://antropogenez.ru/articles/p/18',
+    // 'http://antropogenez.ru/articles/p/19',
+    // 'http://antropogenez.ru/articles/p/20',
+    // 'http://antropogenez.ru/articles/p/21',
+];
 
-spider(url, (err, filename, downloaded) => {
+spider(urls, (err, filename, downloaded) => {
     if (err) {
         console.log(err);
     } else if (downloaded) {
