@@ -17,7 +17,11 @@ function getArticlesData(body) {
 
         const date = dateNode[0].innerHTML;
         const subject = urlNode.innerHTML;
-        const url = urlNode.getAttribute("href");
+        let url = urlNode.getAttribute("href");
+
+        if (url.search(/http:\/\/antropogenez.ru/i) === -1) {
+            url = `http://antropogenez.ru/${url}`
+        }
         return {date, subject, url}
     })
 }
@@ -50,42 +54,61 @@ function downloadArticle(url, filename, callback) {
             if (err) {
                 return callback(err);
             }
-            console.log(`      Saved: ${filename}`);
             callback(null, filename);
         })
     })
 }
 
-let concurrency = 2, running = 0, completed = 0, index = 0;
-const tasks = [];
+class TaskQueue {
+    constructor(concurrency) {
+        this.concurrency = concurrency;
+        this.running = 0;
+        this.queue = [];
+    }
+
+    pushTask(task) {
+        this.queue.push(task);
+        this.next();
+    }
+
+    next() {
+        while (this.running < this.concurrency && this.queue.length) {
+            const task = this.queue.shift();
+            task(() => {
+                this.running--;
+                this.next();
+            });
+            this.running++;
+        }
+    }
+}
+
+const downloadQueue = new TaskQueue(2);
 
 function spiderLinks(currentUrl, body, nesting, callback) {
     if (nesting === 0) {
         return process.nextTick(callback);
     }
     const links = getArticlesData(body);
-    tasks.push(...links);
-
-    function next() {
-        while (running < concurrency && index < tasks.length) {
-            const task = tasks[index++];
-            spider(task, nesting - 1, err => {
-                if (completed === tasks.length) {
-                    return finish();
+    if (links.length === 0) {
+        return process.nextTick(callback);
+    }
+    let completed = 0, hasErrors = false;
+    links.forEach(link => {
+        downloadQueue.pushTask(done => {
+            spider(link, nesting - 1, err => {
+                if (err) {
+                    hasErrors = true;
+                    return callback(err);
                 }
-                completed++;
-                running--;
-                next();
+                if (++completed === links.length && !hasErrors) {
+                    callback(null, currentUrl);
+                }
+                done();
             });
-            running++;
-        }
-    }
+        });
+    });
 
-    next();
-
-    function finish() {
-        return callback(null, currentUrl);
-    }
 }
 
 const spideringMap = new Map();
@@ -120,24 +143,24 @@ function spider(linkData, nesting, callback) {
 const urls = [
     'http://antropogenez.ru/articles/p/1',
     'http://antropogenez.ru/articles/p/2',
-    // 'http://antropogenez.ru/articles/p/3',
-    // 'http://antropogenez.ru/articles/p/4',
-    // 'http://antropogenez.ru/articles/p/5',
-    // 'http://antropogenez.ru/articles/p/6',
-    // 'http://antropogenez.ru/articles/p/8',
-    // 'http://antropogenez.ru/articles/p/9',
-    // 'http://antropogenez.ru/articles/p/10',
-    // 'http://antropogenez.ru/articles/p/11',
-    // 'http://antropogenez.ru/articles/p/12',
-    // 'http://antropogenez.ru/articles/p/13',
-    // 'http://antropogenez.ru/articles/p/14',
-    // 'http://antropogenez.ru/articles/p/15',
-    // 'http://antropogenez.ru/articles/p/16',
-    // 'http://antropogenez.ru/articles/p/17',
-    // 'http://antropogenez.ru/articles/p/18',
-    // 'http://antropogenez.ru/articles/p/19',
-    // 'http://antropogenez.ru/articles/p/20',
-    // 'http://antropogenez.ru/articles/p/21',
+    'http://antropogenez.ru/articles/p/3',
+    'http://antropogenez.ru/articles/p/4',
+    'http://antropogenez.ru/articles/p/5',
+    'http://antropogenez.ru/articles/p/6',
+    'http://antropogenez.ru/articles/p/8',
+    'http://antropogenez.ru/articles/p/9',
+    'http://antropogenez.ru/articles/p/10',
+    'http://antropogenez.ru/articles/p/11',
+    'http://antropogenez.ru/articles/p/12',
+    'http://antropogenez.ru/articles/p/13',
+    'http://antropogenez.ru/articles/p/14',
+    'http://antropogenez.ru/articles/p/15',
+    'http://antropogenez.ru/articles/p/16',
+    'http://antropogenez.ru/articles/p/17',
+    'http://antropogenez.ru/articles/p/18',
+    'http://antropogenez.ru/articles/p/19',
+    'http://antropogenez.ru/articles/p/20',
+    'http://antropogenez.ru/articles/p/21',
 ];
 
 urls.forEach(url => {
