@@ -59,56 +59,21 @@ function downloadArticle(url, filename, callback) {
     })
 }
 
-class TaskQueue {
-    constructor(concurrency) {
-        this.concurrency = concurrency;
-        this.running = 0;
-        this.queue = [];
-    }
-
-    pushTask(task) {
-        this.queue.push(task);
-        this.next();
-    }
-
-    next() {
-        while (this.running < this.concurrency && this.queue.length) {
-            const task = this.queue.shift();
-            task(() => {
-                this.running--;
-                this.next();
-            });
-            this.running++;
-        }
-    }
-}
-
-const downloadQueue = new TaskQueue(2);
-
 function spiderLinks(currentUrl, body, nesting, callback) {
+    let promise = Promise.resolve();
+
     if (nesting === 0) {
-        return process.nextTick(callback);
+        return promise;
     }
     const links = getArticlesData(body);
-    if (links.length === 0) {
-        return process.nextTick(callback);
-    }
-    let completed = 0, hasErrors = false;
     links.forEach(link => {
-        downloadQueue.pushTask(done => {
-            spider(link, nesting - 1, err => {
-                if (err) {
-                    hasErrors = true;
-                    return callback(err);
-                }
-                if (++completed === links.length && !hasErrors) {
-                    callback(null, currentUrl);
-                }
-                done();
-            });
-        });
+        promise = promise.then(() => spider(link, nesting - 1, err => {
+            if (err) {
+                return callback(err)
+            }
+        }))
     });
-
+    return promise;
 }
 
 const spideringMap = new Map();
@@ -139,7 +104,7 @@ function spider(linkData, nesting, callback) {
     });
 }
 
-
+// 194 piece
 const urls = [
     'http://antropogenez.ru/articles/p/1',
     'http://antropogenez.ru/articles/p/2',
