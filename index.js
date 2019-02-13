@@ -68,6 +68,7 @@ function spiderLinks(currentUrl, body, nesting, callback) {
 
     // Parallel logic
     let completed = 0, hasErrors = false;
+
     function done(err) {
         if (err) {
             hasErrors = true;
@@ -83,10 +84,16 @@ function spiderLinks(currentUrl, body, nesting, callback) {
     });
 }
 
+const  spideringMap = new Map();
 
 function spider(linkData, nesting, callback) {
     const filename = linkData.subject ? linkData.subject : linkData;
     const url = linkData.url ? linkData.url : linkData;
+
+    if (spideringMap.has(url)) {
+        return process.nextTick(callback)
+    }
+    spideringMap.set(url, true);
 
     request(url, (err, resp, body) => {
         if (err || resp.statusCode >= 400) {
