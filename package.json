@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "async": "^2.6.2",
     "dom-parser": "^0.1.5",
     "fs": "0.0.1-security",
     "mkdir": "0.0.2",
