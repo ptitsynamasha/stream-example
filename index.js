@@ -59,21 +59,18 @@ function downloadArticle(url, filename, callback) {
     })
 }
 
-function spiderLinks(currentUrl, body, nesting, callback) {
-    let promise = Promise.resolve();
-
+function spiderLinks(currentUrl, body, nesting) {
     if (nesting === 0) {
-        return promise;
+        return Promise.resolve();
     }
     const links = getArticlesData(body);
-    links.forEach(link => {
-        promise = promise.then(() => spider(link, nesting - 1, err => {
-            if (err) {
-                return callback(err)
-            }
-        }))
-    });
-    return promise;
+    const promises = links.map(link => spider(link, nesting - 1, err => {
+        if (err) {
+            return Promise.reject(err)
+        }
+    }));
+
+    return Promise.all(promises);
 }
 
 const spideringMap = new Map();
@@ -100,7 +97,9 @@ function spider(linkData, nesting, callback) {
                 return callback(null);
             });
         }
-        spiderLinks(filename, body, nesting, callback);
+        spiderLinks(filename, body, nesting)
+            .then(() => callback(null, filename))
+            .catch(err => callback(err))
     });
 }
 
@@ -109,23 +108,23 @@ const urls = [
     'http://antropogenez.ru/articles/p/1',
     'http://antropogenez.ru/articles/p/2',
     'http://antropogenez.ru/articles/p/3',
-    'http://antropogenez.ru/articles/p/4',
-    'http://antropogenez.ru/articles/p/5',
-    'http://antropogenez.ru/articles/p/6',
-    'http://antropogenez.ru/articles/p/8',
-    'http://antropogenez.ru/articles/p/9',
-    'http://antropogenez.ru/articles/p/10',
-    'http://antropogenez.ru/articles/p/11',
-    'http://antropogenez.ru/articles/p/12',
-    'http://antropogenez.ru/articles/p/13',
-    'http://antropogenez.ru/articles/p/14',
-    'http://antropogenez.ru/articles/p/15',
-    'http://antropogenez.ru/articles/p/16',
-    'http://antropogenez.ru/articles/p/17',
-    'http://antropogenez.ru/articles/p/18',
-    'http://antropogenez.ru/articles/p/19',
-    'http://antropogenez.ru/articles/p/20',
-    'http://antropogenez.ru/articles/p/21',
+    // 'http://antropogenez.ru/articles/p/4',
+    // 'http://antropogenez.ru/articles/p/5',
+    // 'http://antropogenez.ru/articles/p/6',
+    // 'http://antropogenez.ru/articles/p/8',
+    // 'http://antropogenez.ru/articles/p/9',
+    // 'http://antropogenez.ru/articles/p/10',
+    // 'http://antropogenez.ru/articles/p/11',
+    // 'http://antropogenez.ru/articles/p/12',
+    // 'http://antropogenez.ru/articles/p/13',
+    // 'http://antropogenez.ru/articles/p/14',
+    // 'http://antropogenez.ru/articles/p/15',
+    // 'http://antropogenez.ru/articles/p/16',
+    // 'http://antropogenez.ru/articles/p/17',
+    // 'http://antropogenez.ru/articles/p/18',
+    // 'http://antropogenez.ru/articles/p/19',
+    // 'http://antropogenez.ru/articles/p/20',
+    // 'http://antropogenez.ru/articles/p/21',
 ];
 
 urls.forEach(url => {
