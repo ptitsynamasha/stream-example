@@ -5,6 +5,29 @@ const path = require('path');
 const DomParser = require('dom-parser');
 const parser = new DomParser();
 
+const urls = [
+    'http://antropogenez.ru/articles/p/1',
+    'http://antropogenez.ru/articles/p/2',
+    'http://antropogenez.ru/articles/p/3',
+    'http://antropogenez.ru/articles/p/4',
+    'http://antropogenez.ru/articles/p/5',
+    'http://antropogenez.ru/articles/p/6',
+    'http://antropogenez.ru/articles/p/8',
+    'http://antropogenez.ru/articles/p/9',
+    'http://antropogenez.ru/articles/p/10',
+    'http://antropogenez.ru/articles/p/11',
+    'http://antropogenez.ru/articles/p/12',
+    'http://antropogenez.ru/articles/p/13',
+    'http://antropogenez.ru/articles/p/14',
+    'http://antropogenez.ru/articles/p/15',
+    'http://antropogenez.ru/articles/p/16',
+    'http://antropogenez.ru/articles/p/17',
+    'http://antropogenez.ru/articles/p/18',
+    'http://antropogenez.ru/articles/p/19',
+    'http://antropogenez.ru/articles/p/20',
+    'http://antropogenez.ru/articles/p/21',
+];
+
 function getArticlesData(body) {
     const dom = parser.parseFromString(body, 'text/html');
     const articles = dom
@@ -139,29 +162,6 @@ function spider(linkData, nesting, callback) {
     });
 }
 
-
-const urls = [
-    'http://antropogenez.ru/articles/p/1',
-    'http://antropogenez.ru/articles/p/2',
-    'http://antropogenez.ru/articles/p/3',
-    'http://antropogenez.ru/articles/p/4',
-    'http://antropogenez.ru/articles/p/5',
-    'http://antropogenez.ru/articles/p/6',
-    'http://antropogenez.ru/articles/p/8',
-    'http://antropogenez.ru/articles/p/9',
-    'http://antropogenez.ru/articles/p/10',
-    'http://antropogenez.ru/articles/p/11',
-    'http://antropogenez.ru/articles/p/12',
-    'http://antropogenez.ru/articles/p/13',
-    'http://antropogenez.ru/articles/p/14',
-    'http://antropogenez.ru/articles/p/15',
-    'http://antropogenez.ru/articles/p/16',
-    'http://antropogenez.ru/articles/p/17',
-    'http://antropogenez.ru/articles/p/18',
-    'http://antropogenez.ru/articles/p/19',
-    'http://antropogenez.ru/articles/p/20',
-    'http://antropogenez.ru/articles/p/21',
-];
 
 urls.forEach(url => {
     /*
