@@ -5,6 +5,10 @@ const path = require('path');
 const DomParser = require('dom-parser');
 const parser = new DomParser();
 
+/*
+    body:string - page
+    return - [{date, subject, url}] by page
+ */
 function getArticlesData(body) {
     const dom = parser.parseFromString(body, 'text/html');
     const articles = dom
@@ -13,15 +17,19 @@ function getArticlesData(body) {
     return articles.map(elem => {
         const dateNode = elem.getElementsByClassName('articles_list_date');
         const subjectNode = elem.getElementsByClassName('articles_list_subject')[0];
-        const slugNode = subjectNode.getElementsByTagName('a')[0];
+        const urlNode = subjectNode.getElementsByTagName('a')[0];
 
         const date = dateNode[0].innerHTML;
-        const subject = slugNode.innerHTML;
-        const slug = slugNode.getAttribute("href");
-        return {date, subject, slug}
+        const subject = urlNode.innerHTML;
+        const url = urlNode.getAttribute("href");
+        return {date, subject, url}
     })
 }
 
+/*
+  body: string - page of article
+  return text of article
+ */
 function getArticleText(body) {
     const dom = parser.parseFromString(body, 'text/html');
     const article = dom
@@ -30,6 +38,11 @@ function getArticleText(body) {
     return article[0].innerHTML;
 }
 
+/*
+    filename: string
+    contents: string
+    callback: function
+ */
 function saveFile(filename, contents, callback) {
     mkdirp(path.dirname(filename), err => {
         if (err) {
@@ -39,34 +52,61 @@ function saveFile(filename, contents, callback) {
     });
 }
 
-
-function spider(urls, callback) {
-    urls.forEach(url => {
-        request(url, (err, resp, body) => {
+function downloadArticle(url, filename, callback) {
+    request(url, (err, resp, articleBody) => {
+        if (err) {
+            return callback(err)
+        }
+        const text = getArticleText(articleBody);
+        saveFile(`articles/${filename}.txt`, text, err => {
             if (err) {
-                return callback(err)
+                return callback(err);
             }
-
-            const articles = getArticlesData(body);
-            articles.forEach(({date, subject, slug}) => {
-                request(slug, (err, resp, articleBody) => {
-                    if (err) {
-                        return callback(err)
-                    }
-                    const text = getArticleText(articleBody);
-                    saveFile(`articles/${date}.txt`, text, err => {
-                        if (err) {
-                            return callback(err);
-                        }
-                        console.log(`Downloaded and saved: ${date}`);
-                        callback(null, date);
-                    })
-                })
-            })
+            console.log(`      Saved: ${filename}`);
+            callback(null, filename);
         })
     })
 }
 
+
+function spider(pageData, nesting, callback) {
+    const filename = pageData.subject ? pageData.subject : pageData;
+    const url = pageData.url ? pageData.url : pageData;
+
+    request(url, (err, resp, body) => {
+        if (nesting === 0) {
+            console.log('Downloading: ' + filename);
+            return downloadArticle(url, filename, (err, filename) => {
+                if (err) {
+                    return callback(err);
+                }
+                return callback(null);
+            });
+        }
+        spiderLinks(filename, body, nesting, callback);
+    });
+}
+
+function spiderLinks(filename, body, nesting, callback) {
+    if (nesting === 0) {
+        return process.nextTick(callback);
+    }
+    const links = getArticlesData(body);
+
+    function iterate(index) {
+        if (index === links.length) {
+            return callback(null, filename);
+        }
+        spider(links[index], nesting - 1, function (err) {
+            if (err) {
+                return callback(err);
+            }
+            iterate(index + 1);
+        });
+    }
+
+    iterate(0);
+}
 
 const urls = [
     'http://antropogenez.ru/articles/p/1',
@@ -91,12 +131,16 @@ const urls = [
     // 'http://antropogenez.ru/articles/p/21',
 ];
 
-spider(urls, (err, filename, downloaded) => {
-    if (err) {
-        console.log(err);
-    } else if (downloaded) {
-        console.log(`Completed the download of "${filename}"`);
-    } else {
-        console.log(`"${filename}" was already downloaded`);
-    }
+urls.forEach(url => {
+    /*
+    downloading only with nesting = 0
+     */
+    spider(url, 1, (err, filename) => {
+        if (err) {
+            console.log(err);
+        } else {
+            console.log(`"${filename}" was already downloaded`);
+        }
+    });
 });
+
