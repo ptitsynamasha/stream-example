@@ -13,20 +13,21 @@ function getArticlesData(body) {
     return articles.map(elem => {
         const dateNode = elem.getElementsByClassName('articles_list_date');
         const subjectNode = elem.getElementsByClassName('articles_list_subject')[0];
-        const slugNode = subjectNode.getElementsByTagName('a')[0];
+        const urlNode = subjectNode.getElementsByTagName('a')[0];
 
         const date = dateNode[0].innerHTML;
-        const subject = slugNode.innerHTML;
-        const slug = slugNode.getAttribute("href");
-        return {date, subject, slug}
+        const subject = urlNode.innerHTML;
+        const url = urlNode.getAttribute("href");
+        return {date, subject, url}
     })
 }
 
-function getArticleText(body) {
-    const dom = parser.parseFromString(body, 'text/html');
-    const article = dom
-        .getElementById('content')
-        .getElementsByClassName('tx-antropedia-pi1');
+function getArticleText(body, url) {
+    const content = parser.parseFromString(body, 'text/html').getElementById('content');
+    const article = content.getElementsByClassName('tx-antropedia-pi1');
+    if (article.length === 0) {
+        return content.innerHTML;
+    }
     return article[0].innerHTML;
 }
 
@@ -39,32 +40,69 @@ function saveFile(filename, contents, callback) {
     });
 }
 
-
-function spider(urls, callback) {
-    urls.forEach(url => {
-        request(url, (err, resp, body) => {
+function downloadArticle(url, filename, callback) {
+    request(url, (err, resp, articleBody) => {
+        if (err || resp.statusCode >= 400) {
+            return callback(err)
+        }
+        const text = getArticleText(articleBody, url);
+        saveFile(`articles/${filename}.txt`, text, err => {
             if (err) {
-                return callback(err)
+                return callback(err);
             }
-
-            const articles = getArticlesData(body);
-            articles.forEach(({date, subject, slug}) => {
-                request(slug, (err, resp, articleBody) => {
-                    if (err) {
-                        return callback(err)
-                    }
-                    const text = getArticleText(articleBody);
-                    saveFile(`articles/${date}.txt`, text, err => {
-                        if (err) {
-                            return callback(err);
-                        }
-                        console.log(`Downloaded and saved: ${date}`);
-                        callback(null, date);
-                    })
-                })
-            })
+            console.log(`      Saved: ${filename}`);
+            callback(null, filename);
         })
     })
+}
+
+
+function spiderLinks(currentUrl, body, nesting, callback) {
+    if (nesting === 0) {
+        return process.nextTick(callback);
+    }
+    const links = getArticlesData(body);
+    if (links.length === 0) {
+        return process.nextTick(callback);
+    }
+
+    // Parallel logic
+    let completed = 0, hasErrors = false;
+    function done(err) {
+        if (err) {
+            hasErrors = true;
+            return callback(err);
+        }
+        if (++completed === links.length && !hasErrors) {
+            return callback(null, currentUrl);
+        }
+    }
+
+    links.forEach(link => {
+        spider(link, nesting - 1, done);
+    });
+}
+
+
+function spider(linkData, nesting, callback) {
+    const filename = linkData.subject ? linkData.subject : linkData;
+    const url = linkData.url ? linkData.url : linkData;
+
+    request(url, (err, resp, body) => {
+        if (err || resp.statusCode >= 400) {
+            return callback(err)
+        }
+        if (nesting === 0) {
+            console.log('Downloading: ' + filename);
+            return downloadArticle(url, filename, (err, filename) => {
+                if (err) {
+                    return callback(err);
+                }
+                return callback(null);
+            });
+        }
+        spiderLinks(filename, body, nesting, callback);
+    });
 }
 
 
@@ -72,10 +110,10 @@ const urls = [
     'http://antropogenez.ru/articles/p/1',
     'http://antropogenez.ru/articles/p/2',
     'http://antropogenez.ru/articles/p/3',
-    // 'http://antropogenez.ru/articles/p/4',
-    // 'http://antropogenez.ru/articles/p/5',
-    // 'http://antropogenez.ru/articles/p/6',
-    // 'http://antropogenez.ru/articles/p/8',
+    'http://antropogenez.ru/articles/p/4',
+    'http://antropogenez.ru/articles/p/5',
+    'http://antropogenez.ru/articles/p/6',
+    'http://antropogenez.ru/articles/p/8',
     // 'http://antropogenez.ru/articles/p/9',
     // 'http://antropogenez.ru/articles/p/10',
     // 'http://antropogenez.ru/articles/p/11',
@@ -91,12 +129,17 @@ const urls = [
     // 'http://antropogenez.ru/articles/p/21',
 ];
 
-spider(urls, (err, filename, downloaded) => {
-    if (err) {
-        console.log(err);
-    } else if (downloaded) {
-        console.log(`Completed the download of "${filename}"`);
-    } else {
-        console.log(`"${filename}" was already downloaded`);
-    }
+urls.forEach(url => {
+    /*
+    downloading only with nesting = 0
+     */
+    spider(url, 1, (err, filename) => {
+        if (err) {
+            console.log(err);
+        } else {
+            console.log(`"${filename}" was already downloaded`);
+        }
+    });
 });
+
+
