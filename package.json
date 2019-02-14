@@ -9,13 +9,15 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "co": "^4.6.0",
     "dom-parser": "^0.1.5",
     "fs": "0.0.1-security",
     "mkdir": "0.0.2",
     "mkdirp": "^0.5.1",
     "mongoose": "^5.4.11",
     "path": "^0.12.7",
-    "request": "^2.88.0"
+    "request": "^2.88.0",
+    "thunkify": "^2.1.2"
   },
   "devDependencies": {
     "nodemon": "^1.18.10"

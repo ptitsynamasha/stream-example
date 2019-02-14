@@ -1,9 +1,36 @@
-const request = require('request');
 const fs = require('fs');
-const mkdirp = require('mkdirp');
 const path = require('path');
 const DomParser = require('dom-parser');
 const parser = new DomParser();
+const thunkify = require('thunkify');
+const co = require('co');
+const request = thunkify(require('request'));
+const mkdirp = thunkify(require('mkdirp'));
+const writeFile = thunkify(fs.writeFile);
+const nextTick = thunkify(process.nextTick);
+
+const urls = [
+    'http://antropogenez.ru/articles/p/1',
+    'http://antropogenez.ru/articles/p/2',
+    // 'http://antropogenez.ru/articles/p/3',
+    // 'http://antropogenez.ru/articles/p/4',
+    // 'http://antropogenez.ru/articles/p/5',
+    // 'http://antropogenez.ru/articles/p/6',
+    // 'http://antropogenez.ru/articles/p/8',
+    // 'http://antropogenez.ru/articles/p/9',
+    // 'http://antropogenez.ru/articles/p/10',
+    // 'http://antropogenez.ru/articles/p/11',
+    // 'http://antropogenez.ru/articles/p/12',
+    // 'http://antropogenez.ru/articles/p/13',
+    // 'http://antropogenez.ru/articles/p/14',
+    // 'http://antropogenez.ru/articles/p/15',
+    // 'http://antropogenez.ru/articles/p/16',
+    // 'http://antropogenez.ru/articles/p/17',
+    // 'http://antropogenez.ru/articles/p/18',
+    // 'http://antropogenez.ru/articles/p/19',
+    // 'http://antropogenez.ru/articles/p/20',
+    // 'http://antropogenez.ru/articles/p/21',
+];
 
 /*
     body:string - page
@@ -43,107 +70,56 @@ function getArticleText(body) {
     return article[0].innerHTML;
 }
 
-/*
-    filename: string
-    contents: string
-    callback: function
- */
-function saveFile(filename, contents, callback) {
-    mkdirp(path.dirname(filename), err => {
-        if (err) {
-            return callback(err);
-        }
-        fs.writeFile(filename, contents, callback);
-    });
-}
+function* downloadArticle(url, filename) {
+    const response = yield request(url);
 
-function downloadArticle(url, filename, callback) {
-    request(url, (err, resp, articleBody) => {
-        if (err) {
-            return callback(err)
-        }
-        const text = getArticleText(articleBody);
-        saveFile(`articles/${filename}.txt`, text, err => {
-            if (err) {
-                return callback(err);
-            }
-            console.log(`Saved: ${filename}`);
-            callback(null, filename);
-        })
-    })
+    const body = response[1];
+    const text = getArticleText(body);
+    const pathToFile = `articles/${filename}.txt`;
+
+    yield mkdirp(path.dirname(pathToFile));
+
+    yield writeFile(pathToFile, text);
+    console.log(filename)
+    return body;
 }
 
 
-function spider(pageData, nesting, callback) {
+function* spider(pageData, nesting) {
     const filename = pageData.subject ? pageData.subject : pageData;
     const url = pageData.url ? pageData.url : pageData;
-
-    request(url, (err, resp, body) => {
+    let body;
+    try {
         if (nesting === 0) {
-            return downloadArticle(url, filename, (err, filename) => {
-                if (err) {
-                    return callback(err);
-                }
-                return callback(null);
-            });
+            body = yield downloadArticle(url, filename)
+        } else {
+            const response = yield request(url);
+            body = response[1];
         }
-        spiderLinks(filename, body, nesting, callback);
-    });
+    } catch (err) {
+        throw err
+    }
+    yield spiderLinks(filename, body, nesting);
 }
 
-function spiderLinks(filename, body, nesting, callback) {
+function* spiderLinks(filename, body, nesting) {
     if (nesting === 0) {
-        return process.nextTick(callback);
+        return nextTick();
     }
     const links = getArticlesData(body);
 
-    function iterate(index) {
-        if (index === links.length) {
-            return callback(null, filename);
-        }
-        spider(links[index], nesting - 1, function (err) {
-            if (err) {
-                return callback(err);
-            }
-            iterate(index + 1);
-        });
+    for (let i = 0; i < links.length; i++) {
+        yield spider(links[i], nesting - 1);
     }
-    iterate(0);
 }
 
-const urls = [
-    'http://antropogenez.ru/articles/p/1',
-    'http://antropogenez.ru/articles/p/2',
-    // 'http://antropogenez.ru/articles/p/3',
-    // 'http://antropogenez.ru/articles/p/4',
-    // 'http://antropogenez.ru/articles/p/5',
-    // 'http://antropogenez.ru/articles/p/6',
-    // 'http://antropogenez.ru/articles/p/8',
-    // 'http://antropogenez.ru/articles/p/9',
-    // 'http://antropogenez.ru/articles/p/10',
-    // 'http://antropogenez.ru/articles/p/11',
-    // 'http://antropogenez.ru/articles/p/12',
-    // 'http://antropogenez.ru/articles/p/13',
-    // 'http://antropogenez.ru/articles/p/14',
-    // 'http://antropogenez.ru/articles/p/15',
-    // 'http://antropogenez.ru/articles/p/16',
-    // 'http://antropogenez.ru/articles/p/17',
-    // 'http://antropogenez.ru/articles/p/18',
-    // 'http://antropogenez.ru/articles/p/19',
-    // 'http://antropogenez.ru/articles/p/20',
-    // 'http://antropogenez.ru/articles/p/21',
-];
-
-urls.forEach(url => {
-    /*
-    downloading only with nesting = 0
-     */
-    spider(url, 1, (err, filename) => {
-        if (err) {
-            console.log(err);
-        } else {
-            console.log(`"${filename}" was already downloaded`);
+co(function* () {
+    try {
+        for (let i = 0; i < urls.length; i++) {
+            yield spider(urls[i], 1);
         }
-    });
+        console.log('Download complete');
+    } catch (err) {
+        console.log(err);
+    }
 });
-
