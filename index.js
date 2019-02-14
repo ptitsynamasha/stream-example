@@ -11,7 +11,7 @@ const nextTick = thunkify(process.nextTick);
 
 const urls = [
     'http://antropogenez.ru/articles/p/1',
-    'http://antropogenez.ru/articles/p/2',
+    // 'http://antropogenez.ru/articles/p/2',
     // 'http://antropogenez.ru/articles/p/3',
     // 'http://antropogenez.ru/articles/p/4',
     // 'http://antropogenez.ru/articles/p/5',
@@ -108,9 +108,8 @@ function* spiderLinks(filename, body, nesting) {
     }
     const links = getArticlesData(body);
 
-    for (let i = 0; i < links.length; i++) {
-        yield spider(links[i], nesting - 1);
-    }
+    const tasks = links.map(link => spider(link, nesting - 1));
+    yield tasks;
 }
 
 co(function* () {
